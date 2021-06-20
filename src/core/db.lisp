@@ -125,7 +125,11 @@ Note that DBI:PREPARE-CACHED is added CL-DBI v0.9.5.")
     (with-quote-char
       (multiple-value-bind (sql binds)
           (sxql:yield sql)
-        (execute-sql sql binds)))))
+        (execute-sql sql binds))))
+  (:method :around ((sql sxql.statement::create-table-statement) &optional binds)
+    (declare (ignore binds))
+    (let ((sxql:*use-placeholder* nil))
+      (call-next-method))))
 
 (defun array-convert-nulls-to-nils (results-array)
   (let ((darray (make-array (array-total-size results-array)

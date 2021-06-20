@@ -6,6 +6,8 @@
   (:import-from #:alexandria
                 #:delete-from-plist
                 #:ensure-car)
+  (:import-from #:mito.dao
+                #:convert-for-driver-type)
   (:export #:table-column-class
            #:table-column-type
            #:table-column-not-null-p
@@ -152,10 +154,10 @@
         :not-null ,(or not-null
                        (primary-key-p column)))))
   (:method :around (column driver-type)
-    (let ((rel-column (table-column-references-column column)))
+    (let ((rel-column (table-column-references-column column))
+          (info (call-next-method)))
       (if rel-column
-          (let* ((info (call-next-method))
-                 (rel-col-type (getf (cdr (table-column-info rel-column driver-type)) :type)))
+          (let ((rel-col-type (getf (cdr (table-column-info rel-column driver-type)) :type)))
             (setf (getf (cdr info) :type)
                   (ecase driver-type
                     (:mysql
@@ -173,7 +175,12 @@
                        ((:bigserial :serial) :integer)
                        (otherwise rel-col-type)))))
             info)
-          (call-next-method)))))
+          (let ((initform (c2mop:slot-definition-initform column))
+                (initfunction (c2mop:slot-definition-initfunction column)))
+            (if initfunction
+                (let ((value (convert-for-driver-type driver-type (getf (cdr info) :type) initform)))
+                  (append info (list :default value)))
+                info))))))
 
 (defgeneric table-column-info-for-create-table (column driver-type)
   (:documentation "Similar to table-column-info except the return value is for sxql:make-create-table.")
